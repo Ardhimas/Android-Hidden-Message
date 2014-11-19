@@ -3,7 +3,8 @@
 
     <string name="app_name">Hidden Message</string>
     <string name="app_name_title">HIDDEN\nMESSAGE</string>
-    <string name="dummy_button">Dummy Button</string>
+    <string name="encode_button">Encode</string>
+    <string name="decode_button">Decode</string>
     <string name="dummy_content">DUMMY\nCONTENT</string>
 
 </resources>
