@@ -6,6 +6,7 @@ import android.annotation.TargetApi;
 import android.app.Activity;
 import android.content.Intent;
 import android.database.Cursor;
+import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Build;
@@ -14,6 +15,9 @@ import android.provider.MediaStore;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
+
+import java.io.FileNotFoundException;
+import java.io.InputStream;
 
 
 /**
@@ -39,7 +43,8 @@ public class MainMenu extends Activity {
      */
     private SystemUiHider mSystemUiHider;
 
-    private static int RESULT_LOAD_IMAGE = 1;
+    private static final int SELECT_DECODE = 1;
+    private static final int SELECT_ENCODE = 2;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -47,17 +52,26 @@ public class MainMenu extends Activity {
 
         setContentView(R.layout.activity_main_menu);
 
-        Button buttonLoadImage = (Button) findViewById(R.id.decode_button);
-        buttonLoadImage.setOnClickListener(new View.OnClickListener() {
+        Button buttonDecodeLoad = (Button) findViewById(R.id.decode_button);
+        buttonDecodeLoad.setOnClickListener(new View.OnClickListener() {
 
             @Override
             public void onClick(View arg0) {
 
-                Intent i = new Intent(
-                        Intent.ACTION_PICK,
-                        android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+                Intent photoPickerIntent = new Intent(Intent.ACTION_PICK);
+                photoPickerIntent.setType("image/*");
+                startActivityForResult(photoPickerIntent, SELECT_DECODE);
+            }
+        });
+        Button buttonEncodeLoad = (Button) findViewById(R.id.encode_button);
+        buttonEncodeLoad.setOnClickListener(new View.OnClickListener() {
 
-                startActivityForResult(i, RESULT_LOAD_IMAGE);
+            @Override
+            public void onClick(View arg0) {
+
+                Intent photoPickerIntent = new Intent(Intent.ACTION_PICK);
+                photoPickerIntent.setType("image/*");
+                startActivityForResult(photoPickerIntent, SELECT_ENCODE);
             }
         });
         final View controlsView = findViewById(R.id.fullscreen_content_controls);
@@ -111,34 +125,63 @@ public class MainMenu extends Activity {
                     mSystemUiHider.show();
                 }
             }
-        });
-
-        // Upon interacting with UI controls, delay any scheduled hide()
-        // operations to prevent the jarring behavior of controls going away
-        // while interacting with the UI.
-        //findViewById(R.id.encode_button).setOnTouchListener(mDelayHideTouchListener);
+        }
+        );
     }
 
     @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
+    protected void onActivityResult(int requestCode, int resultCode, Intent imageReturnedIntent) {
+        super.onActivityResult(requestCode, resultCode, imageReturnedIntent);
 
-        if (requestCode == RESULT_LOAD_IMAGE && resultCode == RESULT_OK && null != data) {
-            Uri selectedImage = data.getData();
-            String[] filePathColumn = {MediaStore.Images.Media.DATA};
-
-            Cursor cursor = getContentResolver().query(selectedImage,
-                    filePathColumn, null, null, null);
-            cursor.moveToFirst();
-
-            int columnIndex = cursor.getColumnIndex(filePathColumn[0]);
-            String picturePath = cursor.getString(columnIndex);
-            cursor.close();
-
-            ImageView imageView = (ImageView) findViewById(R.id.imgView);
-            imageView.setImageBitmap(BitmapFactory.decodeFile(picturePath));
+        switch(requestCode) {
+            case SELECT_DECODE:
+                if(resultCode == RESULT_OK){
+                    Uri selectedImage = imageReturnedIntent.getData();
+//                    InputStream imageStream = getContentResolver().openInputStream(selectedImage);
+                    try{
+                        Bitmap yourSelectedImage = decodeUri(selectedImage);
+                        ImageView imageView = (ImageView) findViewById(R.id.imgView);
+                        imageView.setImageBitmap(yourSelectedImage);
+                    } catch (FileNotFoundException e){
+                        String m = e.getMessage();
+                    }
+                }
         }
     }
+
+    private Bitmap decodeUri(Uri selectedImage) throws FileNotFoundException {
+
+        // Decode image size
+        BitmapFactory.Options o = new BitmapFactory.Options();
+        o.inJustDecodeBounds = true;
+        BitmapFactory.decodeStream(getContentResolver().openInputStream(selectedImage), null, o);
+
+        // The new size we want to scale to
+        final int REQUIRED_SIZE = 140;
+
+        // Find the correct scale value. It should be the power of 2.
+        int width_tmp = o.outWidth, height_tmp = o.outHeight;
+        int scale = 1;
+        while (true) {
+            if (width_tmp / 2 < REQUIRED_SIZE
+                    || height_tmp / 2 < REQUIRED_SIZE) {
+                break;
+            }
+            width_tmp /= 2;
+            height_tmp /= 2;
+            scale *= 2;
+        }
+
+        // Decode with inSampleSize
+        BitmapFactory.Options o2 = new BitmapFactory.Options();
+        o2.inSampleSize = scale;
+        return BitmapFactory.decodeStream(getContentResolver().openInputStream(selectedImage), null, o2);
+
+    }
+
+//    protected String inputText() {
+//        String
+//    }
 
     @Override
     protected void onPostCreate(Bundle savedInstanceState) {
